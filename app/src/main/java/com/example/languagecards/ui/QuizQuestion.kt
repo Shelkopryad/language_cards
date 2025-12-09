@@ -2,6 +2,9 @@ package com.example.languagecards.ui
 
 data class QuizQuestion(
     val russianWord: String,
-    val frenchOptions: List<FrenchOption>,
-    val correctAnswerId: Int // id правильного WordCardEntity
-)
+    val wordOptions: List<WordOption>,
+    val correctAnswerId: Int
+) {
+    // Для обратной совместимости
+    val frenchOptions: List<FrenchOption> get() = wordOptions
+}

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -34,14 +35,23 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagecards.dao.GenderType
+import com.example.languagecards.dao.LanguageType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddWordScreen(
+    wordId: Int? = null,
     viewModel: AddWordViewModel = hiltViewModel(),
-    onWordAddedSuccessfully: () -> Unit = {} // Callback для навигации или другого действия после успеха
+    onWordAddedSuccessfully: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
+
+    LaunchedEffect(wordId) {
+        if (wordId != null) {
+            viewModel.loadWordForEditing(wordId)
+        }
+    }
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
@@ -49,10 +59,21 @@ fun AddWordScreen(
         }
     }
 
+    val languageLabel = when (selectedLanguage) {
+        LanguageType.ROMANIAN -> "Română"
+        else -> "Français"
+    }
+
+    val screenTitle = if (uiState.editingWordId != null) {
+        "Редактировать слово ($languageLabel)"
+    } else {
+        "Добавить слово ($languageLabel)"
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Добавить новое слово") },
+                title = { Text(screenTitle) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -69,17 +90,24 @@ fun AddWordScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "Введите французское слово (можно с артиклем):",
+                "Введите слово (можно с артиклем):",
                 style = MaterialTheme.typography.titleMedium
             )
             OutlinedTextField(
-                value = uiState.frenchWordInput,
-                onValueChange = { viewModel.onFrenchWordInputChange(it) },
-                label = { Text("Французское слово") },
+                value = uiState.foreignWordInput,
+                onValueChange = { viewModel.onForeignWordInputChange(it) },
+                label = { 
+                    Text(
+                        if (selectedLanguage == LanguageType.FRENCH) 
+                            "Французское слово" 
+                        else 
+                            "Румынское слово"
+                    ) 
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences // Для l' в начале
+                    capitalization = KeyboardCapitalization.Sentences
                 )
             )
 
@@ -93,22 +121,23 @@ fun AddWordScreen(
                     onValueChange = { viewModel.onArticleChange(it) },
                     label = { Text("Артикль") },
                     modifier = Modifier.weight(1f),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = uiState.isNoun
                 )
                 OutlinedTextField(
-                    value = uiState.derivedFrenchWord,
-                    onValueChange = { /* Обычно это поле не редактируется напрямую */ },
+                    value = uiState.derivedForeignWord,
+                    onValueChange = { },
                     label = { Text("Слово (без артикля)") },
                     modifier = Modifier.weight(2f),
-                    readOnly = true, // Это поле выводится из frenchWordInput
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                    readOnly = true,
+                    colors = TextFieldDefaults.colors(
                         disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                        disabledIndicatorColor = MaterialTheme.colorScheme.outline,
                         disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }
-
 
             Text(
                 "Русский перевод:",
@@ -125,35 +154,67 @@ fun AddWordScreen(
                 )
             )
 
-            Text(
-                "Род слова:",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
-                    selected = uiState.selectedGender == GenderType.MASCULINE,
-                    onClick = { viewModel.onGenderSelected(GenderType.MASCULINE) }
+            // Чекбокс "Не существительное"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { viewModel.onIsNounChanged(!uiState.isNoun) }
+            ) {
+                Checkbox(
+                    checked = !uiState.isNoun,
+                    onCheckedChange = { viewModel.onIsNounChanged(!it) }
                 )
                 Text(
-                    text = "Мужской",
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                        .clickable { viewModel.onGenderSelected(GenderType.MASCULINE) }
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                RadioButton(
-                    selected = uiState.selectedGender == GenderType.FEMININE,
-                    onClick = { viewModel.onGenderSelected(GenderType.FEMININE) }
-                )
-                Text(
-                    text = "Женский",
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                        .clickable { viewModel.onGenderSelected(GenderType.FEMININE) }
+                    text = "Не существительное",
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f)) // Занимает оставшееся место
+            // Выбор рода (только для существительных)
+            if (uiState.isNoun) {
+                Text(
+                    "Род слова:",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = uiState.selectedGender == GenderType.MASCULINE,
+                        onClick = { viewModel.onGenderSelected(GenderType.MASCULINE) }
+                    )
+                    Text(
+                        text = "Муж.",
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .clickable { viewModel.onGenderSelected(GenderType.MASCULINE) }
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    RadioButton(
+                        selected = uiState.selectedGender == GenderType.FEMININE,
+                        onClick = { viewModel.onGenderSelected(GenderType.FEMININE) }
+                    )
+                    Text(
+                        text = "Жен.",
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .clickable { viewModel.onGenderSelected(GenderType.FEMININE) }
+                    )
+                    // Средний род только для румынского
+                    if (selectedLanguage == LanguageType.ROMANIAN) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        RadioButton(
+                            selected = uiState.selectedGender == GenderType.NEUTER,
+                            onClick = { viewModel.onGenderSelected(GenderType.NEUTER) }
+                        )
+                        Text(
+                            text = "Ср.",
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .clickable { viewModel.onGenderSelected(GenderType.NEUTER) }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
 
             uiState.userMessage?.let { message ->
                 Text(
@@ -176,7 +237,7 @@ fun AddWordScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Сохранить слово")
+                    Text(if (uiState.editingWordId != null) "Обновить слово" else "Сохранить слово")
                 }
             }
         }

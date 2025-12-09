@@ -24,11 +24,18 @@ object AppModule {
             "app_database"
         )
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
+            .addMigrations(MIGRATION_1_2)
             .build()
     }
 
     @Provides
     fun wordCardDao(appDatabase: AppDatabase): WordCardDao {
         return appDatabase.wordCardDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(@ApplicationContext context: Context): SettingsRepository {
+        return SettingsRepository(context)
     }
 }

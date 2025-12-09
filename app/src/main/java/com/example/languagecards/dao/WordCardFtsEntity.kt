@@ -5,14 +5,13 @@ import androidx.room.Entity
 import androidx.room.Fts4
 
 // FTS таблица для поиска по словам
+// Порядок полей важен для Room миграции!
 @Entity(tableName = "word_cards_fts")
-@Fts4(contentEntity = WordCardEntity::class, tokenizer = "unicode61") // Связываем с основной Entity
+@Fts4(contentEntity = WordCardEntity::class, tokenizer = "unicode61")
 data class WordCardFtsEntity(
-    // Важно: имена колонок в FTS-таблице должны совпадать
-    // с именами колонок в contentEntity (WordCardEntity), по которым будет поиск.
-    @ColumnInfo(name = "french_word")
-    val frenchWord: String,
-
     @ColumnInfo(name = "russian_translation")
-    val russianTranslation: String
+    val russianTranslation: String,
+
+    @ColumnInfo(name = "foreign_word")
+    val foreignWord: String
 )

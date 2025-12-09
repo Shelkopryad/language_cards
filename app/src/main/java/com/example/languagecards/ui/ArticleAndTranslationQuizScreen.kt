@@ -40,40 +40,42 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.languagecards.dao.LanguageType
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticleAndTranslationQuizScreen(
     viewModel: ArticleAndTranslationQuizViewModel = hiltViewModel(),
-    onQuizFinished: () -> Unit = {} // Если нужно действие по завершению (например, нет слов)
+    onQuizFinished: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     val focusManager = LocalFocusManager.current
     val translationFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(uiState.currentWord) {
-        // Когда слово меняется, сбрасываем фокус или устанавливаем на первое поле
-        // Также можно очищать сообщение об обратной связи, если оно не очищается в ViewModel
         if (uiState.currentWord != null) {
-            viewModel.clearFeedbackMessage() // Очищаем старое сообщение
+            viewModel.clearFeedbackMessage()
         }
     }
 
     LaunchedEffect(uiState.feedbackMessage) {
-        if (uiState.feedbackMessage != null && uiState.feedbackMessage.toString()
-                .startsWith("Отлично!")
-        ) {
-            delay(1500) // Небольшая задержка перед загрузкой следующего слова
+        if (uiState.feedbackMessage != null && uiState.feedbackMessage.toString().startsWith("Отлично!")) {
+            delay(1500)
             viewModel.loadNextWord()
         }
     }
 
+    val languageLabel = when (selectedLanguage) {
+        LanguageType.ROMANIAN -> "Română"
+        else -> "Français"
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Квиз: Артикль и Перевод") },
+                title = { Text("Квиз: Артикль и Перевод ($languageLabel)") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -93,6 +95,7 @@ fun ArticleAndTranslationQuizScreen(
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.padding(top = 50.dp))
             } else if (uiState.currentWord == null) {
+                println(uiState.toString())
                 Text(
                     text = uiState.feedbackMessage ?: "Нет слов для этого квиза.",
                     style = MaterialTheme.typography.headlineSmall,
@@ -100,57 +103,68 @@ fun ArticleAndTranslationQuizScreen(
                     modifier = Modifier.padding(top = 50.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = {
-                    // Возможно, перейти на другой экран или показать диалог добавления слов
-                    onQuizFinished()
-                }) {
+                Button(onClick = { onQuizFinished() }) {
                     Text("Вернуться")
                 }
             } else {
                 val wordInfo = uiState.currentWord!!
+                val hasArticle = uiState.hasArticle
 
                 Text(
-                    text = "Введите артикль и перевод для слова:",
+                    text = if (hasArticle) {
+                        "Введите артикль и перевод для слова:"
+                    } else {
+                        "Введите перевод для слова:"
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     textAlign = TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Строка для артикля и французского слова
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = uiState.userAnswerArticle,
-                        onValueChange = { viewModel.onUserArticleChange(it) },
-                        label = { Text("Артикль") },
-                        modifier = Modifier
-                            .weight(0.3f) // Меньше места для артикля
-                            .padding(end = 8.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            capitalization = KeyboardCapitalization.None,
-                            imeAction = ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { translationFocusRequester.requestFocus() }
-                        ),
-                        textStyle = TextStyle(fontSize = 18.sp),
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            focusedBorderColor = if (uiState.showResult) (if (uiState.isCorrectArticle == true) Color.Green else Color.Red) else MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = if (uiState.showResult) (if (uiState.isCorrectArticle == true) Color.Green else if (uiState.isCorrectArticle == false) Color.Red else MaterialTheme.colorScheme.outline) else MaterialTheme.colorScheme.outline,
+                if (hasArticle) {
+                    // Показываем поле артикля и слово в одной строке
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.userAnswerArticle,
+                            onValueChange = { viewModel.onUserArticleChange(it) },
+                            label = { Text("Артикль") },
+                            modifier = Modifier
+                                .weight(0.3f)
+                                .padding(end = 8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                capitalization = KeyboardCapitalization.None,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { translationFocusRequester.requestFocus() }
+                            ),
+                            textStyle = TextStyle(fontSize = 18.sp),
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = if (uiState.showResult) (if (uiState.isCorrectArticle == true) Color.Green else Color.Red) else MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = if (uiState.showResult) (if (uiState.isCorrectArticle == true) Color.Green else if (uiState.isCorrectArticle == false) Color.Red else MaterialTheme.colorScheme.outline) else MaterialTheme.colorScheme.outline,
+                            )
                         )
-                    )
+                        Text(
+                            text = wordInfo.foreignWord,
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.weight(0.7f)
+                        )
+                    }
+                } else {
+                    // Показываем только слово без поля артикля
                     Text(
-                        text = wordInfo.frenchWord,
+                        text = wordInfo.foreignWord,
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier.weight(0.7f)
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                // Поле для ввода перевода
                 OutlinedTextField(
                     value = uiState.userAnswerTranslation,
                     onValueChange = { viewModel.onUserTranslationChange(it) },
@@ -170,25 +184,29 @@ fun ArticleAndTranslationQuizScreen(
                         }
                     ),
                     textStyle = TextStyle(fontSize = 18.sp),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        focusedBorderColor = if (uiState.showResult) (if (uiState.isCorrectTranslation == true) Color.Green else Color.Red) else MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = if (uiState.showResult) (if (uiState.isCorrectTranslation == true) Color.Green else if (uiState.isCorrectTranslation == false) Color.Red else MaterialTheme.colorScheme.outline) else MaterialTheme.colorScheme.outline,
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = if (uiState.showResult) (if (uiState.isCorrectTranslation == true) Color.Green else Color.Red) else MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = if (uiState.showResult) (if (uiState.isCorrectTranslation == true) Color.Green else if (uiState.isCorrectTranslation == false) Color.Red else MaterialTheme.colorScheme.outline) else MaterialTheme.colorScheme.outline,
                     )
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Сообщение с результатом
                 if (uiState.showResult && uiState.feedbackMessage != null) {
+                    val isSuccess = if (uiState.hasArticle) {
+                        uiState.isCorrectArticle == true && uiState.isCorrectTranslation == true
+                    } else {
+                        uiState.isCorrectTranslation == true
+                    }
                     Text(
                         text = uiState.feedbackMessage!!,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (uiState.isCorrectArticle == true && uiState.isCorrectTranslation == true) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                        color = if (isSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f)) // Занимает оставшееся место
+                Spacer(modifier = Modifier.weight(1f))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -199,7 +217,7 @@ fun ArticleAndTranslationQuizScreen(
                             focusManager.clearFocus()
                             viewModel.checkAnswer()
                         },
-                        enabled = !uiState.isLoading && uiState.currentWord != null && !uiState.showResult, // Активна только до проверки
+                        enabled = !uiState.isLoading && uiState.currentWord != null && !uiState.showResult,
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 4.dp)
@@ -217,7 +235,12 @@ fun ArticleAndTranslationQuizScreen(
                             .weight(1f)
                             .padding(horizontal = 4.dp)
                     ) {
-                        Text(if (uiState.showResult && uiState.isCorrectArticle == true && uiState.isCorrectTranslation == true) "Далее" else "Пропустить")
+                        val isSuccess = if (uiState.hasArticle) {
+                            uiState.isCorrectArticle == true && uiState.isCorrectTranslation == true
+                        } else {
+                            uiState.isCorrectTranslation == true
+                        }
+                        Text(if (uiState.showResult && isSuccess) "Далее" else "Пропустить")
                     }
                 }
             }

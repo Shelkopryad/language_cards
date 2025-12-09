@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.languagecards.ui.AddWordScreen
 import com.example.languagecards.ui.ArticleAndTranslationQuizScreen
+import com.example.languagecards.ui.SettingsScreen
 import com.example.languagecards.ui.TranslationQuizScreen
 import com.example.languagecards.ui.WordListScreen
 import com.example.testapp.ui.theme.LanguageCardsTheme
@@ -93,6 +95,17 @@ class MainActivity : ComponentActivity() {
                                         contentDescription = "Word List"
                                     )
                                 }
+
+                                IconButton(
+                                    onClick = {
+                                        navController.navigate("settings")
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Settings,
+                                        contentDescription = "Settings"
+                                    )
+                                }
                             }
                         )
                     }
@@ -110,14 +123,33 @@ class MainActivity : ComponentActivity() {
                             ArticleAndTranslationQuizScreen()
                         }
 
-                        composable("addWords") {
-                            AddWordScreen()
+                        composable(
+                            route = "addWords?wordId={wordId}",
+                            arguments = listOf(
+                                androidx.navigation.navArgument("wordId") {
+                                    type = androidx.navigation.NavType.IntType
+                                    defaultValue = -1
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val wordId = backStackEntry.arguments?.getInt("wordId")?.takeIf { it != -1 }
+                            AddWordScreen(
+                                wordId = wordId,
+                                onWordAddedSuccessfully = { navController.popBackStack() }
+                            )
                         }
 
                         composable("wordList") {
                             WordListScreen(
-                                onNavigateToAddWord = { navController.navigate("addWords") }
+                                onNavigateToAddWord = { navController.navigate("addWords") },
+                                onNavigateToEditWord = { wordId ->
+                                    navController.navigate("addWords?wordId=$wordId")
+                                }
                             )
+                        }
+
+                        composable("settings") {
+                            SettingsScreen()
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 package com.example.languagecards.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,23 +49,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagecards.dao.GenderType
+import com.example.languagecards.dao.LanguageType
 import com.example.languagecards.dao.WordCardEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WordListScreen(
     viewModel: WordListViewModel = hiltViewModel(),
-    onNavigateToAddWord: () -> Unit = {}
+    onNavigateToAddWord: () -> Unit = {},
+    onNavigateToEditWord: (Int) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState() // Собираем searchQuery отдельно для TextField
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
 
     val focusManager = LocalFocusManager.current
 
-    // Цвета для родов
     val feminineColor = Color(0xFFF8BBD0)
     val masculineColor = Color(0xFFB3E5FC)
-    val defaultRowColor = MaterialTheme.colorScheme.surface
+    val neuterColor = Color(0xFFC8E6C9)
+    val defaultRowColor = Color(0xFFE0E0E0)
+
+    val languageLabel = when (selectedLanguage) {
+        LanguageType.ROMANIAN -> "Română"
+        else -> "Français"
+    }
 
     if (uiState.showDeleteConfirmDialog && uiState.wordToDelete != null) {
         AlertDialog(
@@ -72,7 +81,7 @@ fun WordListScreen(
             title = { Text("Удалить слово?") },
             text = {
                 Text(
-                    "Вы уверены, что хотите удалить слово \"${uiState.wordToDelete?.frenchWord} / ${uiState.wordToDelete?.russianTranslation}\"?"
+                    "Вы уверены, что хотите удалить слово \"${uiState.wordToDelete?.foreignWord} / ${uiState.wordToDelete?.russianTranslation}\"?"
                 )
             },
             confirmButton = {
@@ -91,7 +100,7 @@ fun WordListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Список слов") },
+                title = { Text("Список слов ($languageLabel)") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -127,15 +136,14 @@ fun WordListScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
-                    focusManager.clearFocus() // Скрыть клавиатуру при нажатии "Search"
+                    focusManager.clearFocus()
                 })
             )
 
-            // Список слов
             Box(
-                modifier = Modifier.weight(1f) // Занимает оставшееся место
+                modifier = Modifier.weight(1f)
             ) {
-                if (uiState.isLoading && uiState.words.isEmpty()) { // Показываем загрузку только если список еще пуст
+                if (uiState.isLoading && uiState.words.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else if (uiState.words.isEmpty() && searchQuery.isNotEmpty()) {
                     Text(
@@ -163,8 +171,19 @@ fun WordListScreen(
                                 wordCard = wordCard,
                                 feminineColor = feminineColor,
                                 masculineColor = masculineColor,
+                                neuterColor = neuterColor,
                                 defaultColor = defaultRowColor,
-                                onLongClick = {
+                                onClick = {
+                                    viewModel.onWordSelectedForMenu(wordCard)
+                                },
+                                isMenuExpanded = uiState.selectedWordForMenu?.id == wordCard.id,
+                                onDismissMenu = { viewModel.onDismissMenu() },
+                                onEditClick = {
+                                    viewModel.onDismissMenu()
+                                    onNavigateToEditWord(wordCard.id)
+                                },
+                                onDeleteClick = {
+                                    viewModel.onDismissMenu()
                                     viewModel.onWordSelectedForDelete(wordCard)
                                 }
                             )
@@ -178,51 +197,74 @@ fun WordListScreen(
 }
 
 @Composable
-fun WordCardItem( // Эта функция остается такой же, как и раньше
+fun WordCardItem(
     wordCard: WordCardEntity,
     feminineColor: Color,
     masculineColor: Color,
+    neuterColor: Color,
     defaultColor: Color,
-    onLongClick: () -> Unit // Добавили обработчик долгого нажатия
+    onClick: () -> Unit,
+    isMenuExpanded: Boolean,
+    onDismissMenu: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val backgroundColor = when (wordCard.gender) {
         GenderType.FEMININE -> feminineColor
         GenderType.MASCULINE -> masculineColor
+        GenderType.NEUTER -> neuterColor
         else -> defaultColor
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(backgroundColor)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        val frenchDisplay = buildAnnotatedString {
-            if (!wordCard.article.isNullOrBlank()) {
-                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
-                    append(wordCard.article)
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(backgroundColor)
+                .clickable { onClick() }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            val foreignDisplay = buildAnnotatedString {
+                if (wordCard.article.isNotBlank()) {
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
+                        append(wordCard.article)
+                    }
+                    append(" ")
                 }
-                append(" ")
+                withStyle(style = SpanStyle(fontSize = 18.sp)) {
+                    append(wordCard.foreignWord)
+                }
             }
-            withStyle(style = SpanStyle(fontSize = 18.sp)) {
-                append(wordCard.frenchWord)
-            }
+            Text(
+                text = foreignDisplay,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = wordCard.russianTranslation,
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = 17.sp,
+                modifier = Modifier.padding(start = 16.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-        Text(
-            text = frenchDisplay,
-            modifier = Modifier.weight(1f),
-            maxLines = 1, // Ограничиваем одной строкой
-            overflow = TextOverflow.Ellipsis // Добавляем многоточие, если текст не помещается
-        )
-        Text(
-            text = wordCard.russianTranslation,
-            style = MaterialTheme.typography.bodyLarge,
-            fontSize = 17.sp,
-            modifier = Modifier.padding(start = 16.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+
+        androidx.compose.material3.DropdownMenu(
+            expanded = isMenuExpanded,
+            onDismissRequest = onDismissMenu
+        ) {
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Редактировать") },
+                onClick = onEditClick
+            )
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Удалить") },
+                onClick = onDeleteClick
+            )
+        }
     }
 }

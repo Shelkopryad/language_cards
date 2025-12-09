@@ -3,49 +3,71 @@ package com.example.languagecards.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.languagecards.dao.GenderType
+import com.example.languagecards.dao.LanguageType
+import com.example.languagecards.dao.SettingsRepository
 import com.example.languagecards.dao.WordCardEntity
 import com.example.languagecards.dao.WordCardDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class AddWordUiState(
-    val frenchWordInput: String = "", // Слово как вводит юзер, может содержать артикль вначале
-    val derivedFrenchWord: String = "", // Слово без артикля
+    val foreignWordInput: String = "",
+    val derivedForeignWord: String = "",
     val russianTranslation: String = "",
     val article: String = "",
-    val selectedGender: Int? = null, // null, GenderType.MASCULINE, GenderType.FEMININE
+    val selectedGender: Int? = null,
+    val isNoun: Boolean = true,
     val isSaving: Boolean = false,
     val userMessage: String? = null,
-    val saveSuccess: Boolean = false
+    val saveSuccess: Boolean = false,
+    val editingWordId: Int? = null
 )
 
 @HiltViewModel
 class AddWordViewModel @Inject constructor(
-    private val wordCardDao: WordCardDao
+    private val wordCardDao: WordCardDao,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddWordUiState())
     val uiState = _uiState.asStateFlow()
 
-    // Фокусируемся на определенных артиклях
-    // 'les' добавлен, так как это определенный артикль множественного числа,
-    // но он не поможет определить род единственного числа.
-    private val definiteArticles = mapOf(
+    // Глобальный выбор языка из настроек
+    val selectedLanguage = settingsRepository.selectedLanguage
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LanguageType.FRENCH)
+
+    // Французские артикли
+    private val frenchArticles = mapOf(
         "le" to GenderType.MASCULINE,
         "la" to GenderType.FEMININE,
-        "l'" to null, // Род не определяем однозначно, пользователь должен выбрать
-        "les" to null // Множественное число, род для единственного числа не определяем
+        "l'" to null,
+        "les" to null
     )
 
-    fun onFrenchWordInputChange(input: String) {
-        val trimmedInput = input.trimStart() // Убираем пробелы только в начале для парсинга артикля
+    // Румынские артикли
+    private val romanianArticles = mapOf(
+        "un" to GenderType.MASCULINE,
+        "o" to GenderType.FEMININE,
+    )
+
+    private fun getCurrentArticlesMap(): Map<String, Int?> {
+        return when (selectedLanguage.value) {
+            LanguageType.ROMANIAN -> romanianArticles
+            else -> frenchArticles
+        }
+    }
+
+    fun onForeignWordInputChange(input: String) {
+        val trimmedInput = input.trimStart()
         _uiState.update {
             it.copy(
-                frenchWordInput = trimmedInput,
+                foreignWordInput = trimmedInput,
                 saveSuccess = false,
                 userMessage = null
             )
@@ -54,52 +76,32 @@ class AddWordViewModel @Inject constructor(
     }
 
     private fun extractArticleAndWord(input: String) {
-        var currentArticle =
-            _uiState.value.article // Сохраняем текущий артикль, если пользователь его уже ввел/изменил
+        var currentArticle = _uiState.value.article
         var currentWord = input
-        var preselectedGender: Int? =
-            _uiState.value.selectedGender // Сохраняем текущий выбор пользователя
+        var preselectedGender: Int? = _uiState.value.selectedGender
+        val articlesMap = getCurrentArticlesMap()
 
         var foundArticle = false
-        for ((art, genderMarker) in definiteArticles) {
-            // Проверяем, начинается ли строка с артикля и за ним пробел, или это l' и за ним буква
+        for ((art, genderMarker) in articlesMap) {
             if (input.startsWith("$art ", ignoreCase = true) ||
-                (art == "l'" && input.startsWith(
-                    art,
-                    ignoreCase = true
-                ) && input.length > art.length && input[art.length].isLetter())
+                (art == "l'" && input.startsWith(art, ignoreCase = true) 
+                    && input.length > art.length && input[art.length].isLetter())
             ) {
                 currentArticle = input.substring(0, art.length)
-                currentWord =
-                    input.substring(art.length).trimStart() // Убираем пробел после артикля
-                if (genderMarker != null) { // Если артикль однозначно указывает на род
+                currentWord = input.substring(art.length).trimStart()
+                if (genderMarker != null) {
                     preselectedGender = genderMarker
-                } else if (art == "l'") {
-                    // Для l' не сбрасываем род, если он уже был выбран пользователем.
-                    // Пользователь должен будет подтвердить или выбрать.
                 }
                 foundArticle = true
                 break
             }
         }
 
-        if (!foundArticle && currentWord.contains(" ")) {
-            // Если артикль не распознан, но есть пробел, возможно, пользователь ввел что-то свое
-            // В этом случае, не трогаем поле артикля, если он его уже редактировал,
-            // и слово остается как есть (без автоматического отсечения)
-            // Либо можно очистить currentArticle, если мы не хотим сохранять "неправильные" артикли
-            // currentArticle = "" // Раскомментировать, если нужно очищать поле артикля при нераспознанном
-        } else if (!foundArticle) {
-            // Если артикль не найден и нет пробелов (одно слово), то артикля нет
-            // Не меняем currentArticle, если пользователь его ввел вручную ранее
-        }
-
-
         _uiState.update {
             it.copy(
-                derivedFrenchWord = currentWord,
-                article = if (foundArticle) currentArticle else it.article, // Обновляем артикль только если нашли
-                selectedGender = preselectedGender
+                derivedForeignWord = currentWord,
+                article = if (foundArticle) currentArticle else it.article,
+                selectedGender = if (_uiState.value.isNoun) preselectedGender else null
             )
         }
     }
@@ -117,26 +119,36 @@ class AddWordViewModel @Inject constructor(
     fun onArticleChange(articleInput: String) {
         val trimmedArticle = articleInput.trim()
         var newSelectedGender = _uiState.value.selectedGender
+        val articlesMap = getCurrentArticlesMap()
 
-        // Попробуем определить род по новому артиклю
         val articleKey = trimmedArticle.lowercase()
-        if (definiteArticles.containsKey(articleKey)) {
-            definiteArticles[articleKey]?.let { gender ->
+        if (articlesMap.containsKey(articleKey)) {
+            articlesMap[articleKey]?.let { gender ->
                 newSelectedGender = gender
             }
-            // Если это l' или les, и род был null, не меняем его на null,
-            // даем пользователю выбрать или оставляем предыдущий выбор.
-            if (definiteArticles[articleKey] == null && _uiState.value.selectedGender != null) {
-                // не меняем newSelectedGender
+            if (articlesMap[articleKey] == null && _uiState.value.selectedGender != null) {
+                // не меняем
             } else {
-                newSelectedGender = definiteArticles[articleKey] ?: _uiState.value.selectedGender
+                newSelectedGender = articlesMap[articleKey] ?: _uiState.value.selectedGender
             }
         }
 
         _uiState.update {
             it.copy(
                 article = trimmedArticle,
-                selectedGender = newSelectedGender,
+                selectedGender = if (_uiState.value.isNoun) newSelectedGender else null,
+                saveSuccess = false,
+                userMessage = null
+            )
+        }
+    }
+
+    fun onIsNounChanged(isNoun: Boolean) {
+        _uiState.update {
+            it.copy(
+                isNoun = isNoun,
+                selectedGender = if (isNoun) it.selectedGender else null,
+                article = if (isNoun) it.article else "",
                 saveSuccess = false,
                 userMessage = null
             )
@@ -144,46 +156,16 @@ class AddWordViewModel @Inject constructor(
     }
 
     fun onGenderSelected(gender: Int) {
-        var updatedArticle = _uiState.value.article
-        // Если артикль пуст или l', и пользователь выбрал род,
-        // можно предложить стандартный артикль.
-        // Но для l' это сложнее, так как зависит от следующей буквы слова.
-        // Пока оставим артикль как есть, если он l'.
-        // Пользователь должен сам корректно ввести l' если слово начинается с гласной.
-        if (updatedArticle.isBlank() || updatedArticle.lowercase() !in listOf(
-                "le",
-                "la",
-                "l'",
-                "les"
-            )
-        ) {
-            updatedArticle = when (gender) {
-                GenderType.MASCULINE -> "le"
-                GenderType.FEMININE -> "la"
-                else -> ""
-            }
-            // Проверка на l' (упрощенная, без учета h muet)
-            val wordStartsWithVowel = _uiState.value.derivedFrenchWord.lowercase().firstOrNull()
-                ?.let { it in "aeiouyàâéèêëîïôùûü" } == true
-            if (wordStartsWithVowel && (updatedArticle == "le" || updatedArticle == "la")) {
-                updatedArticle = "l'"
-            }
-        } else if ((updatedArticle.lowercase() == "le" && gender == GenderType.FEMININE) ||
-            (updatedArticle.lowercase() == "la" && gender == GenderType.MASCULINE)
-        ) {
-            // Если артикль противоречит выбранному роду (и это не l'), обновляем артикль
-            updatedArticle = when (gender) {
-                GenderType.MASCULINE -> "le"
-                GenderType.FEMININE -> "la"
-                else -> ""
-            }
-            val wordStartsWithVowel = _uiState.value.derivedFrenchWord.lowercase().firstOrNull()
-                ?.let { it in "aeiouyàâéèêëîïôùûü" } == true
-            if (wordStartsWithVowel && (updatedArticle == "le" || updatedArticle == "la")) {
-                updatedArticle = "l'"
-            }
-        }
+        if (!_uiState.value.isNoun) return
 
+        var updatedArticle = _uiState.value.article
+        val language = selectedLanguage.value
+
+        if (updatedArticle.isBlank()) {
+            updatedArticle = getDefaultArticleForGender(gender, language)
+        } else if (shouldUpdateArticleForGender(updatedArticle, gender, language)) {
+            updatedArticle = getDefaultArticleForGender(gender, language)
+        }
 
         _uiState.update {
             it.copy(
@@ -195,86 +177,142 @@ class AddWordViewModel @Inject constructor(
         }
     }
 
+    private fun getDefaultArticleForGender(gender: Int, language: Int): String {
+        return when (language) {
+            LanguageType.FRENCH -> {
+                val wordStartsWithVowel = _uiState.value.derivedForeignWord.lowercase().firstOrNull()
+                    ?.let { it in "aeiouyàâéèêëîïôùûü" } == true
+                when {
+                    wordStartsWithVowel -> "l'"
+                    gender == GenderType.MASCULINE -> "le"
+                    gender == GenderType.FEMININE -> "la"
+                    else -> ""
+                }
+            }
+            LanguageType.ROMANIAN -> when (gender) {
+                GenderType.MASCULINE -> "un"
+                GenderType.FEMININE -> "o"
+                GenderType.NEUTER -> "un"
+                else -> ""
+            }
+            else -> ""
+        }
+    }
+
+    private fun shouldUpdateArticleForGender(article: String, gender: Int, language: Int): Boolean {
+        return when (language) {
+            LanguageType.FRENCH -> {
+                (article.lowercase() == "le" && gender == GenderType.FEMININE) ||
+                (article.lowercase() == "la" && gender == GenderType.MASCULINE)
+            }
+            LanguageType.ROMANIAN -> {
+                (article.lowercase() == "un" && gender == GenderType.FEMININE) ||
+                (article.lowercase() == "o" && gender == GenderType.MASCULINE)
+            }
+            else -> false
+        }
+    }
+
+    fun loadWordForEditing(wordId: Int) {
+        viewModelScope.launch {
+            val word = wordCardDao.getWordById(wordId)
+            if (word != null) {
+                val isNoun = word.gender != null
+                val foreignWordInput = if (word.article.isNotBlank()) {
+                    "${word.article} ${word.foreignWord}"
+                } else {
+                    word.foreignWord
+                }
+                
+                _uiState.update {
+                    it.copy(
+                        editingWordId = wordId,
+                        foreignWordInput = foreignWordInput,
+                        derivedForeignWord = word.foreignWord,
+                        russianTranslation = word.russianTranslation,
+                        article = word.article,
+                        selectedGender = word.gender,
+                        isNoun = isNoun,
+                        saveSuccess = false,
+                        userMessage = null
+                    )
+                }
+            }
+        }
+    }
+
     fun saveWord() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, userMessage = null, saveSuccess = false) }
 
             val currentState = _uiState.value
-            val frenchWordToSave = currentState.derivedFrenchWord.trim()
+            val foreignWordToSave = currentState.derivedForeignWord.trim()
             val russianTranslationToSave = currentState.russianTranslation.trim()
-            // Используем артикль из state, который мог быть автоматически скорректирован
-            // или введен пользователем.
             val articleToSave = currentState.article.trim()
 
-            // Валидация
-            if (frenchWordToSave.isBlank()) {
+            if (foreignWordToSave.isBlank()) {
                 _uiState.update {
-                    it.copy(
-                        isSaving = false,
-                        userMessage = "Французское слово не может быть пустым."
-                    )
+                    it.copy(isSaving = false, userMessage = "Слово не может быть пустым.")
                 }
                 return@launch
             }
             if (russianTranslationToSave.isBlank()) {
                 _uiState.update {
-                    it.copy(
-                        isSaving = false,
-                        userMessage = "Русский перевод не может быть пустым."
-                    )
+                    it.copy(isSaving = false, userMessage = "Русский перевод не может быть пустым.")
                 }
                 return@launch
             }
-            if (currentState.selectedGender == null) {
+            if (currentState.isNoun && currentState.selectedGender == null) {
                 _uiState.update {
-                    it.copy(
-                        isSaving = false,
-                        userMessage = "Необходимо выбрать род слова."
-                    )
+                    it.copy(isSaving = false, userMessage = "Необходимо выбрать род слова.")
                 }
                 return@launch
             }
-            // Проверка артикля: если выбран род, артикль не должен быть пустым,
-            // если это не слово, которое используется без артикля (что маловероятно для французских существительных с родом).
-            // Логика в onGenderSelected должна была предложить артикль.
-            // Если артикль 'les', а выбран род единственного числа, это может быть несоответствие,
-            // но мы сохраним как есть, предполагая, что пользователь знает, что делает,
-            // или что 'les' используется как пример. Для простоты пока не добавляем сложную валидацию на 'les'.
-            if (articleToSave.isBlank() && currentState.selectedGender != null) {
-                // Можно добавить предупреждение, но onGenderSelected должен был это исправить.
-                // Если все же пустой, можно попробовать его установить еще раз на основе рода.
-                // Но лучше, чтобы предыдущие шаги это гарантировали.
-                // Для простоты, если он пуст, а род выбран, это может быть ошибкой в логике выше.
-                // _uiState.update { it.copy(isSaving = false, userMessage = "Артикль не может быть пустым при выбранном роде.") }
-                // return@launch
-            }
-
-
-            val wordCard = WordCardEntity(
-                frenchWord = frenchWordToSave.lowercase(),
-                russianTranslation = russianTranslationToSave.lowercase(),
-                article = articleToSave.lowercase(), // Сохраняем артикль из состояния
-                gender = currentState.selectedGender // selectedGender гарантированно не null после проверки выше
-            )
 
             try {
-                // Предполагается, что у вас есть метод insertWord или аналогичный в WordCardDao
-                wordCardDao.insertWord(wordCard)
-                _uiState.update {
-                    it.copy(
-                        isSaving = false,
-                        userMessage = "Слово '${wordCard.frenchWord}' успешно сохранено!",
-                        saveSuccess = true,
-                        // Сброс полей для следующего ввода
-                        frenchWordInput = "",
-                        derivedFrenchWord = "",
-                        russianTranslation = "",
-                        article = "",
-                        selectedGender = null
+                if (currentState.editingWordId != null) {
+                    // Update existing word
+                    val wordCard = WordCardEntity(
+                        id = currentState.editingWordId,
+                        foreignWord = foreignWordToSave.lowercase(),
+                        russianTranslation = russianTranslationToSave.lowercase(),
+                        article = articleToSave.lowercase(),
+                        gender = if (currentState.isNoun) currentState.selectedGender else null,
+                        language = selectedLanguage.value
                     )
+                    wordCardDao.updateWord(wordCard)
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            userMessage = "Слово '${wordCard.foreignWord}' успешно обновлено!",
+                            saveSuccess = true
+                        )
+                    }
+                } else {
+                    // Insert new word
+                    val wordCard = WordCardEntity(
+                        foreignWord = foreignWordToSave.lowercase(),
+                        russianTranslation = russianTranslationToSave.lowercase(),
+                        article = articleToSave.lowercase(),
+                        gender = if (currentState.isNoun) currentState.selectedGender else null,
+                        language = selectedLanguage.value
+                    )
+                    wordCardDao.insertWord(wordCard)
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            userMessage = "Слово '${wordCard.foreignWord}' успешно сохранено!",
+                            saveSuccess = true,
+                            foreignWordInput = "",
+                            derivedForeignWord = "",
+                            russianTranslation = "",
+                            article = "",
+                            selectedGender = null,
+                            isNoun = true
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                // Обработка возможных ошибок при вставке в БД (например, нарушение unique constraint)
                 _uiState.update {
                     it.copy(
                         isSaving = false,

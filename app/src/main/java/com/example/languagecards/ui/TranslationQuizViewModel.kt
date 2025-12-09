@@ -4,18 +4,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.languagecards.dao.GenderType
+import com.example.languagecards.dao.LanguageType
+import com.example.languagecards.dao.SettingsRepository
 import com.example.languagecards.dao.WordCardDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class TranslationQuizViewModel @Inject constructor(
-    private val wordCardDao: WordCardDao
+    private val wordCardDao: WordCardDao,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _currentQuestion = MutableStateFlow<QuizQuestion?>(null)
@@ -27,21 +32,32 @@ class TranslationQuizViewModel @Inject constructor(
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
+    val selectedLanguage = settingsRepository.selectedLanguage
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LanguageType.FRENCH)
+
     private val feminineColor = Color(0xFFF8BBD0)
     private val masculineColor = Color(0xFFB3E5FC)
-    private val defaultColor = Color.Transparent
+    private val neuterColor = Color(0xFFC8E6C9)
+    private val defaultColor = Color(0xFFE0E0E0)
 
     init {
-        loadNextQuestion()
+        viewModelScope.launch {
+            // Ждём первое значение из DataStore перед загрузкой
+            settingsRepository.selectedLanguage.first()
+            loadNextQuestion()
+        }
     }
 
     fun loadNextQuestion() {
         viewModelScope.launch {
             _isLoading.value = true
             _userMessage.value = null
-            val allWords = wordCardDao.getAllWords().firstOrNull() // Получаем один раз список
+            
+            // Получаем актуальное значение языка из DataStore
+            val language = settingsRepository.selectedLanguage.first()
+            val allWords = wordCardDao.getRandomWords(limit = 10, language = language)
 
-            if (allWords.isNullOrEmpty() || allWords.size < 4) { // Нужно хотя бы 4 слова для 3 неправильных вариантов + 1 правильный
+            if (allWords.size < 4) {
                 _userMessage.value = "Недостаточно слов в базе данных для начала квиза."
                 _currentQuestion.value = null
                 _isLoading.value = false
@@ -51,16 +67,13 @@ class TranslationQuizViewModel @Inject constructor(
             val randomWord = allWords.random()
             val correctAnswerId = randomWord.id
 
-            // Формируем неправильные варианты
             val incorrectOptions = allWords
-                .filter { it.id != correctAnswerId } // Исключаем правильный ответ
-                .shuffled() // Перемешиваем
-                .take(3)    // Берем 3 неправильных варианта
+                .filter { it.id != correctAnswerId }
+                .shuffled()
+                .take(3)
 
             if (incorrectOptions.size < 3) {
                 _userMessage.value = "Недостаточно слов для формирования вариантов ответа."
-                // Можно показать только правильный ответ или меньше вариантов
-                // Для простоты пока просто выведем сообщение
                 _currentQuestion.value = null
                 _isLoading.value = false
                 return@launch
@@ -68,18 +81,19 @@ class TranslationQuizViewModel @Inject constructor(
 
             val allOptionsEntities = (incorrectOptions + randomWord).shuffled()
 
-            val frenchOptions = allOptionsEntities.map { wordEntity ->
+            val wordOptions = allOptionsEntities.map { wordEntity ->
                 val color = when (wordEntity.gender) {
                     GenderType.FEMININE -> feminineColor
                     GenderType.MASCULINE -> masculineColor
+                    GenderType.NEUTER -> neuterColor
                     else -> defaultColor
                 }
-                FrenchOption(wordCard = wordEntity, displayColor = color)
+                WordOption(wordCard = wordEntity, displayColor = color)
             }
 
             _currentQuestion.value = QuizQuestion(
                 russianWord = randomWord.russianTranslation,
-                frenchOptions = frenchOptions,
+                wordOptions = wordOptions,
                 correctAnswerId = correctAnswerId
             )
             _isLoading.value = false

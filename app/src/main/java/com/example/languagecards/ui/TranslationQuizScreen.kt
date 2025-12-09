@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.languagecards.dao.LanguageType
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +44,7 @@ fun TranslationQuizScreen(
     val currentQuestion by viewModel.currentQuestion.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val userMessage by viewModel.userMessage.collectAsState()
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
 
     LaunchedEffect(userMessage) {
         if (userMessage != null) {
@@ -51,10 +53,15 @@ fun TranslationQuizScreen(
         }
     }
 
+    val languageLabel = when (selectedLanguage) {
+        LanguageType.ROMANIAN -> "Română"
+        else -> "Français"
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Квиз: Перевод слов") },
+                title = { Text("Квиз ($languageLabel)") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -69,31 +76,32 @@ fun TranslationQuizScreen(
                 .padding(16.dp),
             contentAlignment = Alignment.TopCenter
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (currentQuestion == null) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Text(
-                        text = userMessage ?: "Нет доступных вопросов. Добавьте слова в словарь.",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { viewModel.loadNextQuestion() }) {
-                        Text("Попробовать снова")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.padding(top = 32.dp))
+                } else if (currentQuestion == null) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text(
+                            text = userMessage ?: "Нет доступных вопросов. Добавьте слова в словарь.",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.loadNextQuestion() }) {
+                            Text("Попробовать снова")
+                        }
                     }
-                }
-            } else {
-                val question = currentQuestion!!
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                } else {
+                    val question = currentQuestion!!
+
                     Text(
                         text = "Переведите слово:",
                         style = MaterialTheme.typography.titleLarge
@@ -112,15 +120,13 @@ fun TranslationQuizScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
 
-                    question.frenchOptions.forEach { option ->
+                    question.wordOptions.forEach { option ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable {
-                                    val isCorrect = viewModel.checkAnswer(option.wordCard.id)
-                                    if (isCorrect) {
-                                    }
+                                    viewModel.checkAnswer(option.wordCard.id)
                                 },
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                             colors = CardDefaults.cardColors(containerColor = option.displayColor)
@@ -128,18 +134,17 @@ fun TranslationQuizScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    // .background(option.displayColor) // Цвет теперь в Card
                                     .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween // Для артикля справа
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = option.wordCard.frenchWord,
+                                    text = option.wordCard.foreignWord,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Medium
                                 )
-                                option.wordCard.article?.takeIf { it.isNotBlank() }
+                                option.wordCard.article.takeIf { it.isNotBlank() }
                                     ?.let { article ->
                                         Text(
                                             text = article,
@@ -154,7 +159,6 @@ fun TranslationQuizScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Сообщение для пользователя (правильно/неправильно)
                     userMessage?.let { message ->
                         Text(
                             text = message,
@@ -164,7 +168,7 @@ fun TranslationQuizScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.weight(1f)) // Занимает оставшееся место, чтобы кнопки были внизу
+                    Spacer(modifier = Modifier.weight(1f))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -176,14 +180,6 @@ fun TranslationQuizScreen(
                         ) {
                             Text("Следующий вопрос")
                         }
-                        // Можно добавить кнопку для перехода к другому типу квиза, если есть
-                        // Button(
-                        //     onClick = onNavigateToNextQuestionType,
-                        //     modifier = Modifier.weight(1f),
-                        //     enabled = false // Сделать активной, когда будет реализовано
-                        // ) {
-                        //     Text("Другой квиз")
-                        // }
                     }
                 }
             }
