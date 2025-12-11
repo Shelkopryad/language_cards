@@ -5,24 +5,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -71,37 +79,39 @@ fun AddWordScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(screenTitle) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
-    ) { paddingValues ->
+        contentWindowInsets = androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
+            .exclude(androidx.compose.foundation.layout.WindowInsets.statusBars)
+    ) {
+        paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
-                .imePadding(),
+                .imePadding()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Простой заголовок вместо TopAppBar
             Text(
-                "Введите слово (можно с артиклем):",
+                text = screenTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Text(
+                "Введите слово:",
                 style = MaterialTheme.typography.titleMedium
             )
             OutlinedTextField(
-                value = uiState.foreignWordInput,
-                onValueChange = { viewModel.onForeignWordInputChange(it) },
+                value = uiState.fullWord,
+                onValueChange = { viewModel.onFullWordChange(it) },
                 label = { 
                     Text(
                         if (selectedLanguage == LanguageType.FRENCH) 
-                            "Французское слово" 
+                            "Французское слово (например: le chat)" 
                         else 
-                            "Румынское слово"
+                            "Румынское слово (например: un pisică)"
                     ) 
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -111,48 +121,52 @@ fun AddWordScreen(
                 )
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = uiState.article,
-                    onValueChange = { viewModel.onArticleChange(it) },
-                    label = { Text("Артикль") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    enabled = uiState.isNoun
-                )
-                OutlinedTextField(
-                    value = uiState.derivedForeignWord,
-                    onValueChange = { },
-                    label = { Text("Слово (без артикля)") },
-                    modifier = Modifier.weight(2f),
-                    readOnly = true,
-                    colors = TextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledContainerColor = MaterialTheme.colorScheme.surface,
-                        disabledIndicatorColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
-            }
-
             Text(
-                "Русский перевод:",
+                "Русские переводы:",
                 style = MaterialTheme.typography.titleMedium
             )
-            OutlinedTextField(
-                value = uiState.russianTranslation,
-                onValueChange = { viewModel.onRussianTranslationChange(it) },
-                label = { Text("Русский перевод") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences
+
+            uiState.translations.forEachIndexed { index, translation ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = translation,
+                        onValueChange = { viewModel.onTranslationChange(index, it) },
+                        label = { Text("Перевод ${index + 1}") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences
+                        )
+                    )
+                    if (uiState.translations.size > 1) {
+                        IconButton(
+                            onClick = { viewModel.removeTranslation(index) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "Удалить перевод"
+                            )
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = { viewModel.addTranslation() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "Добавить перевод",
+                    modifier = Modifier.size(20.dp)
                 )
-            )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Добавить еще перевод")
+            }
 
             // Чекбокс "Не существительное"
             Row(

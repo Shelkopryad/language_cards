@@ -9,9 +9,7 @@ import androidx.room.Fts4
 @Entity(tableName = "word_cards_fts")
 @Fts4(contentEntity = WordCardEntity::class, tokenizer = "unicode61")
 data class WordCardFtsEntity(
-    @ColumnInfo(name = "russian_translation")
-    val russianTranslation: String,
-
-    @ColumnInfo(name = "foreign_word")
-    val foreignWord: String
+    @ColumnInfo(name = "full_word")
+    val fullWord: String
 )
+

@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
@@ -45,14 +47,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagecards.dao.GenderType
 import com.example.languagecards.dao.LanguageType
+import com.example.languagecards.dao.TranslationEntity
 import com.example.languagecards.dao.WordCardEntity
+import com.example.languagecards.dao.WordWithTranslations
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WordListScreen(
     viewModel: WordListViewModel = hiltViewModel(),
@@ -63,6 +67,35 @@ fun WordListScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
 
+    WordListContent(
+        uiState = uiState,
+        searchQuery = searchQuery,
+        selectedLanguage = selectedLanguage,
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
+        onNavigateToAddWord = onNavigateToAddWord,
+        onNavigateToEditWord = onNavigateToEditWord,
+        onWordSelectedForMenu = viewModel::onWordSelectedForMenu,
+        onDismissMenu = viewModel::onDismissMenu,
+        onWordSelectedForDelete = viewModel::onWordSelectedForDelete,
+        onDismissDeleteDialog = viewModel::onDismissDeleteDialog,
+        onConfirmDelete = viewModel::onConfirmDelete
+    )
+}
+
+@Composable
+fun WordListContent(
+    uiState: WordListUiState,
+    searchQuery: String,
+    selectedLanguage: Int,
+    onSearchQueryChanged: (String) -> Unit,
+    onNavigateToAddWord: () -> Unit,
+    onNavigateToEditWord: (Int) -> Unit,
+    onWordSelectedForMenu: (WordWithTranslations) -> Unit,
+    onDismissMenu: () -> Unit,
+    onWordSelectedForDelete: (WordWithTranslations) -> Unit,
+    onDismissDeleteDialog: () -> Unit,
+    onConfirmDelete: () -> Unit
+) {
     val focusManager = LocalFocusManager.current
 
     val feminineColor = Color(0xFFF8BBD0)
@@ -76,21 +109,22 @@ fun WordListScreen(
     }
 
     if (uiState.showDeleteConfirmDialog && uiState.wordToDelete != null) {
+        val translationsText = uiState.wordToDelete.translations.joinToString(", ") { it.translation }
         AlertDialog(
-            onDismissRequest = { viewModel.onDismissDeleteDialog() },
+            onDismissRequest = onDismissDeleteDialog,
             title = { Text("Удалить слово?") },
             text = {
                 Text(
-                    "Вы уверены, что хотите удалить слово \"${uiState.wordToDelete?.foreignWord} / ${uiState.wordToDelete?.russianTranslation}\"?"
+                    "Вы уверены, что хотите удалить слово \"${uiState.wordToDelete.word.fullWord} / $translationsText\"?"
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.onConfirmDelete() }) {
+                TextButton(onClick = onConfirmDelete) {
                     Text("Удалить")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.onDismissDeleteDialog() }) {
+                TextButton(onClick = onDismissDeleteDialog) {
                     Text("Отмена")
                 }
             }
@@ -98,15 +132,8 @@ fun WordListScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Список слов ($languageLabel)") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
+        contentWindowInsets = androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
+            .exclude(androidx.compose.foundation.layout.WindowInsets.statusBars),
         floatingActionButton = {
             FloatingActionButton(onClick = onNavigateToAddWord) {
                 Icon(Icons.Filled.Add, contentDescription = "Добавить слово")
@@ -118,9 +145,16 @@ fun WordListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Простой заголовок вместо TopAppBar
+            Text(
+                text = "Список слов ($languageLabel)",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                onValueChange = onSearchQueryChanged,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -128,7 +162,7 @@ fun WordListScreen(
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Поиск") },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                        IconButton(onClick = { onSearchQueryChanged("") }) {
                             Icon(Icons.Filled.Clear, contentDescription = "Очистить поиск")
                         }
                     }
@@ -166,25 +200,25 @@ fun WordListScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
-                        items(uiState.words, key = { word -> word.id }) { wordCard ->
+                        items(uiState.words, key = { wordWithTranslations -> wordWithTranslations.word.id }) { wordWithTranslations ->
                             WordCardItem(
-                                wordCard = wordCard,
+                                wordWithTranslations = wordWithTranslations,
                                 feminineColor = feminineColor,
                                 masculineColor = masculineColor,
                                 neuterColor = neuterColor,
                                 defaultColor = defaultRowColor,
                                 onClick = {
-                                    viewModel.onWordSelectedForMenu(wordCard)
+                                    onWordSelectedForMenu(wordWithTranslations)
                                 },
-                                isMenuExpanded = uiState.selectedWordForMenu?.id == wordCard.id,
-                                onDismissMenu = { viewModel.onDismissMenu() },
+                                isMenuExpanded = uiState.selectedWordForMenu?.word?.id == wordWithTranslations.word.id,
+                                onDismissMenu = onDismissMenu,
                                 onEditClick = {
-                                    viewModel.onDismissMenu()
-                                    onNavigateToEditWord(wordCard.id)
+                                    onDismissMenu()
+                                    onNavigateToEditWord(wordWithTranslations.word.id)
                                 },
                                 onDeleteClick = {
-                                    viewModel.onDismissMenu()
-                                    viewModel.onWordSelectedForDelete(wordCard)
+                                    onDismissMenu()
+                                    onWordSelectedForDelete(wordWithTranslations)
                                 }
                             )
                             Divider()
@@ -198,7 +232,7 @@ fun WordListScreen(
 
 @Composable
 fun WordCardItem(
-    wordCard: WordCardEntity,
+    wordWithTranslations: WordWithTranslations,
     feminineColor: Color,
     masculineColor: Color,
     neuterColor: Color,
@@ -209,47 +243,35 @@ fun WordCardItem(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    val backgroundColor = when (wordCard.gender) {
+    val backgroundColor = when (wordWithTranslations.word.gender) {
         GenderType.FEMININE -> feminineColor
         GenderType.MASCULINE -> masculineColor
         GenderType.NEUTER -> neuterColor
         else -> defaultColor
     }
 
+    val translationsText = wordWithTranslations.translations.joinToString(", ") { it.translation }
+
     Box {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(backgroundColor)
                 .clickable { onClick() }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            val foreignDisplay = buildAnnotatedString {
-                if (wordCard.article.isNotBlank()) {
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
-                        append(wordCard.article)
-                    }
-                    append(" ")
-                }
-                withStyle(style = SpanStyle(fontSize = 18.sp)) {
-                    append(wordCard.foreignWord)
-                }
-            }
             Text(
-                text = foreignDisplay,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = wordWithTranslations.word.fullWord,
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
             )
             Text(
-                text = wordCard.russianTranslation,
-                style = MaterialTheme.typography.bodyLarge,
-                fontSize = 17.sp,
-                modifier = Modifier.padding(start = 16.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                text = translationsText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         }
 
@@ -267,4 +289,55 @@ fun WordCardItem(
             )
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun WordListScreenPreview() {
+    val sampleWords = listOf(
+        WordWithTranslations(
+            word = WordCardEntity(id = 1, fullWord = "le chat", gender = GenderType.MASCULINE, language = LanguageType.FRENCH),
+            translations = listOf(TranslationEntity(id = 1, wordCardId = 1, translation = "кот"))
+        ),
+        WordWithTranslations(
+            word = WordCardEntity(id = 2, fullWord = "la maison", gender = GenderType.FEMININE, language = LanguageType.FRENCH),
+            translations = listOf(TranslationEntity(id = 2, wordCardId = 2, translation = "дом"), TranslationEntity(id = 3, wordCardId = 2, translation = "жилище"))
+        ),
+        WordWithTranslations(
+            word = WordCardEntity(id = 3, fullWord = "bonjour", gender = null, language = LanguageType.FRENCH),
+            translations = listOf(TranslationEntity(id = 4, wordCardId = 3, translation = "привет"), TranslationEntity(id = 5, wordCardId = 3, translation = "здравствуйте"))
+        )
+    )
+
+    WordListContent(
+        uiState = WordListUiState(words = sampleWords, isLoading = false),
+        searchQuery = "",
+        selectedLanguage = LanguageType.FRENCH,
+        onSearchQueryChanged = {},
+        onNavigateToAddWord = {},
+        onNavigateToEditWord = {},
+        onWordSelectedForMenu = {},
+        onDismissMenu = {},
+        onWordSelectedForDelete = {},
+        onDismissDeleteDialog = {},
+        onConfirmDelete = {}
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun WordListScreenEmptyPreview() {
+    WordListContent(
+        uiState = WordListUiState(words = emptyList(), isLoading = false),
+        searchQuery = "",
+        selectedLanguage = LanguageType.FRENCH,
+        onSearchQueryChanged = {},
+        onNavigateToAddWord = {},
+        onNavigateToEditWord = {},
+        onWordSelectedForMenu = {},
+        onDismissMenu = {},
+        onWordSelectedForDelete = {},
+        onDismissDeleteDialog = {},
+        onConfirmDelete = {}
+    )
 }

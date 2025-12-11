@@ -18,15 +18,12 @@ object LanguageType {
 @Entity(
     tableName = "word_cards",
     indices = [
-        androidx.room.Index(value = ["foreign_word", "language"], unique = true),
-        androidx.room.Index(value = ["russian_translation"])
+        androidx.room.Index(value = ["full_word", "language"], unique = true)
     ]
 )
 data class WordCardEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    @ColumnInfo(name = "article") val article: String,
-    @ColumnInfo(name = "foreign_word") val foreignWord: String,
-    @ColumnInfo(name = "russian_translation") val russianTranslation: String,
+    @ColumnInfo(name = "full_word") val fullWord: String,
     @ColumnInfo(name = "gender") val gender: Int?, // null для не-существительных
     @ColumnInfo(name = "language") val language: Int = LanguageType.FRENCH,
 )

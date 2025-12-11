@@ -11,30 +11,47 @@ import kotlinx.coroutines.flow.Flow
 interface WordCardDao {
 
     @Insert
-    suspend fun insertWord(wordCardEntity: WordCardEntity)
+    suspend fun insertWord(wordCardEntity: WordCardEntity): Long
+
+    @Insert
+    suspend fun insertTranslation(translationEntity: TranslationEntity)
 
     @Update
     suspend fun updateWord(wordCardEntity: WordCardEntity)
 
+    @Delete
+    suspend fun deleteWord(wordCard: WordCardEntity)
+
     @Query("SELECT * FROM word_cards WHERE id = :id LIMIT 1")
     suspend fun getWordById(id: Int): WordCardEntity?
 
-    @Query("SELECT * FROM word_cards WHERE language = :language ORDER BY foreign_word ASC")
-    fun getAllWords(language: Int): Flow<List<WordCardEntity>>
+    @androidx.room.Transaction
+    @Query("SELECT * FROM word_cards WHERE id = :id LIMIT 1")
+    suspend fun getWordWithTranslationsById(id: Int): WordWithTranslations?
 
-    @Query("SELECT * FROM word_cards ORDER BY foreign_word ASC")
-    fun getAllWordsAllLanguages(): Flow<List<WordCardEntity>>
+    @androidx.room.Transaction
+    @Query("SELECT * FROM word_cards WHERE language = :language ORDER BY full_word ASC")
+    fun getAllWordsWithTranslations(language: Int): Flow<List<WordWithTranslations>>
 
+    @androidx.room.Transaction
+    @Query("SELECT * FROM word_cards ORDER BY full_word ASC")
+    fun getAllWordsWithTranslationsAllLanguages(): Flow<List<WordWithTranslations>>
+
+    @Query("SELECT * FROM translations WHERE word_card_id = :wordId")
+    suspend fun getTranslationsForWord(wordId: Int): List<TranslationEntity>
+
+    @Query("DELETE FROM translations WHERE word_card_id = :wordId")
+    suspend fun deleteTranslationsForWord(wordId: Int)
+
+    // Поиск по слову и переводам
+    // Используем простой LIKE вместо FTS для надежности
+    @androidx.room.Transaction
     @Query("""
-            SELECT wc.* FROM word_cards AS wc
-            JOIN word_cards_fts AS wcf ON wc.id = wcf.rowid
-            WHERE wcf.word_cards_fts MATCH :query AND wc.language = :language
-        """)
-    fun searchWords(query: String, language: Int): Flow<List<WordCardEntity>>
-
-    @Query("SELECT * FROM word_cards WHERE language = :language ORDER BY RANDOM() LIMIT :limit")
-    suspend fun getRandomWords(limit: Int, language: Int): List<WordCardEntity>
-
-    @Delete
-    suspend fun deleteWord(wordCard: WordCardEntity)
+        SELECT DISTINCT wc.* FROM word_cards AS wc
+        LEFT JOIN translations AS t ON wc.id = t.word_card_id
+        WHERE (wc.full_word LIKE '%' || :query || '%' OR t.translation LIKE '%' || :query || '%')
+        AND wc.language = :language
+        ORDER BY wc.full_word ASC
+    """)
+    fun searchWordsWithTranslations(query: String, language: Int): Flow<List<WordWithTranslations>>
 }

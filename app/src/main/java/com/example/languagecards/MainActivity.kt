@@ -7,10 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,9 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.languagecards.ui.AddWordScreen
-import com.example.languagecards.ui.ArticleAndTranslationQuizScreen
 import com.example.languagecards.ui.SettingsScreen
-import com.example.languagecards.ui.TranslationQuizScreen
 import com.example.languagecards.ui.WordListScreen
 import com.example.testapp.ui.theme.LanguageCardsTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -51,26 +48,18 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         TopAppBar(
                             title = { Text(stringResource(R.string.app_name)) },
+                            windowInsets = androidx.compose.foundation.layout.WindowInsets.statusBars,
                             actions = {
                                 IconButton(
                                     onClick = {
-                                        navController.navigate("translateQuiz")
+                                        navController.navigate("wordList") {
+                                            popUpTo("wordList") { inclusive = true }
+                                        }
                                     }
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.Check,
-                                        contentDescription = "Translate Quiz"
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        navController.navigate("articleQuiz")
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Create,
-                                        contentDescription = "Article Quiz"
+                                        imageVector = Icons.Filled.List,
+                                        contentDescription = "Word List"
                                     )
                                 }
 
@@ -82,17 +71,6 @@ class MainActivity : ComponentActivity() {
                                     Icon(
                                         imageVector = Icons.Filled.Add,
                                         contentDescription = "Add new word"
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        navController.navigate("wordList")
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.List,
-                                        contentDescription = "Word List"
                                     )
                                 }
 
@@ -112,17 +90,9 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = "translateQuiz",
+                        startDestination = "wordList",
                         modifier = Modifier.padding(innerPadding),
                     ) {
-                        composable("translateQuiz") {
-                            TranslationQuizScreen()
-                        }
-
-                        composable("articleQuiz") {
-                            ArticleAndTranslationQuizScreen()
-                        }
-
                         composable(
                             route = "addWords?wordId={wordId}",
                             arguments = listOf(

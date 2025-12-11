@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.languagecards.dao.GenderType
 import com.example.languagecards.dao.LanguageType
 import com.example.languagecards.dao.SettingsRepository
+import com.example.languagecards.dao.TranslationEntity
 import com.example.languagecards.dao.WordCardEntity
 import com.example.languagecards.dao.WordCardDao
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,10 +18,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class AddWordUiState(
-    val foreignWordInput: String = "",
-    val derivedForeignWord: String = "",
-    val russianTranslation: String = "",
-    val article: String = "",
+    val fullWord: String = "",
+    val translations: List<String> = listOf(""),
     val selectedGender: Int? = null,
     val isNoun: Boolean = true,
     val isSaving: Boolean = false,
@@ -42,104 +41,51 @@ class AddWordViewModel @Inject constructor(
     val selectedLanguage = settingsRepository.selectedLanguage
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LanguageType.FRENCH)
 
-    // Французские артикли
-    private val frenchArticles = mapOf(
-        "le" to GenderType.MASCULINE,
-        "la" to GenderType.FEMININE,
-        "l'" to null,
-        "les" to null
-    )
-
-    // Румынские артикли
-    private val romanianArticles = mapOf(
-        "un" to GenderType.MASCULINE,
-        "o" to GenderType.FEMININE,
-    )
-
-    private fun getCurrentArticlesMap(): Map<String, Int?> {
-        return when (selectedLanguage.value) {
-            LanguageType.ROMANIAN -> romanianArticles
-            else -> frenchArticles
-        }
-    }
-
-    fun onForeignWordInputChange(input: String) {
-        val trimmedInput = input.trimStart()
+    fun onFullWordChange(word: String) {
         _uiState.update {
             it.copy(
-                foreignWordInput = trimmedInput,
-                saveSuccess = false,
-                userMessage = null
-            )
-        }
-        extractArticleAndWord(trimmedInput)
-    }
-
-    private fun extractArticleAndWord(input: String) {
-        var currentArticle = _uiState.value.article
-        var currentWord = input
-        var preselectedGender: Int? = _uiState.value.selectedGender
-        val articlesMap = getCurrentArticlesMap()
-
-        var foundArticle = false
-        for ((art, genderMarker) in articlesMap) {
-            if (input.startsWith("$art ", ignoreCase = true) ||
-                (art == "l'" && input.startsWith(art, ignoreCase = true) 
-                    && input.length > art.length && input[art.length].isLetter())
-            ) {
-                currentArticle = input.substring(0, art.length)
-                currentWord = input.substring(art.length).trimStart()
-                if (genderMarker != null) {
-                    preselectedGender = genderMarker
-                }
-                foundArticle = true
-                break
-            }
-        }
-
-        _uiState.update {
-            it.copy(
-                derivedForeignWord = currentWord,
-                article = if (foundArticle) currentArticle else it.article,
-                selectedGender = if (_uiState.value.isNoun) preselectedGender else null
-            )
-        }
-    }
-
-    fun onRussianTranslationChange(translation: String) {
-        _uiState.update {
-            it.copy(
-                russianTranslation = translation.trimStart(),
+                fullWord = word.trimStart(),
                 saveSuccess = false,
                 userMessage = null
             )
         }
     }
 
-    fun onArticleChange(articleInput: String) {
-        val trimmedArticle = articleInput.trim()
-        var newSelectedGender = _uiState.value.selectedGender
-        val articlesMap = getCurrentArticlesMap()
-
-        val articleKey = trimmedArticle.lowercase()
-        if (articlesMap.containsKey(articleKey)) {
-            articlesMap[articleKey]?.let { gender ->
-                newSelectedGender = gender
-            }
-            if (articlesMap[articleKey] == null && _uiState.value.selectedGender != null) {
-                // не меняем
-            } else {
-                newSelectedGender = articlesMap[articleKey] ?: _uiState.value.selectedGender
+    fun onTranslationChange(index: Int, translation: String) {
+        val updatedTranslations = _uiState.value.translations.toMutableList()
+        if (index < updatedTranslations.size) {
+            updatedTranslations[index] = translation.trimStart()
+            _uiState.update {
+                it.copy(
+                    translations = updatedTranslations,
+                    saveSuccess = false,
+                    userMessage = null
+                )
             }
         }
+    }
 
+    fun addTranslation() {
         _uiState.update {
             it.copy(
-                article = trimmedArticle,
-                selectedGender = if (_uiState.value.isNoun) newSelectedGender else null,
+                translations = it.translations + "",
                 saveSuccess = false,
                 userMessage = null
             )
+        }
+    }
+
+    fun removeTranslation(index: Int) {
+        if (_uiState.value.translations.size > 1) {
+            val updatedTranslations = _uiState.value.translations.toMutableList()
+            updatedTranslations.removeAt(index)
+            _uiState.update {
+                it.copy(
+                    translations = updatedTranslations,
+                    saveSuccess = false,
+                    userMessage = null
+                )
+            }
         }
     }
 
@@ -148,7 +94,6 @@ class AddWordViewModel @Inject constructor(
             it.copy(
                 isNoun = isNoun,
                 selectedGender = if (isNoun) it.selectedGender else null,
-                article = if (isNoun) it.article else "",
                 saveSuccess = false,
                 userMessage = null
             )
@@ -158,79 +103,28 @@ class AddWordViewModel @Inject constructor(
     fun onGenderSelected(gender: Int) {
         if (!_uiState.value.isNoun) return
 
-        var updatedArticle = _uiState.value.article
-        val language = selectedLanguage.value
-
-        if (updatedArticle.isBlank()) {
-            updatedArticle = getDefaultArticleForGender(gender, language)
-        } else if (shouldUpdateArticleForGender(updatedArticle, gender, language)) {
-            updatedArticle = getDefaultArticleForGender(gender, language)
-        }
-
         _uiState.update {
             it.copy(
                 selectedGender = gender,
-                article = updatedArticle,
                 saveSuccess = false,
                 userMessage = null
             )
         }
     }
 
-    private fun getDefaultArticleForGender(gender: Int, language: Int): String {
-        return when (language) {
-            LanguageType.FRENCH -> {
-                val wordStartsWithVowel = _uiState.value.derivedForeignWord.lowercase().firstOrNull()
-                    ?.let { it in "aeiouyàâéèêëîïôùûü" } == true
-                when {
-                    wordStartsWithVowel -> "l'"
-                    gender == GenderType.MASCULINE -> "le"
-                    gender == GenderType.FEMININE -> "la"
-                    else -> ""
-                }
-            }
-            LanguageType.ROMANIAN -> when (gender) {
-                GenderType.MASCULINE -> "un"
-                GenderType.FEMININE -> "o"
-                GenderType.NEUTER -> "un"
-                else -> ""
-            }
-            else -> ""
-        }
-    }
-
-    private fun shouldUpdateArticleForGender(article: String, gender: Int, language: Int): Boolean {
-        return when (language) {
-            LanguageType.FRENCH -> {
-                (article.lowercase() == "le" && gender == GenderType.FEMININE) ||
-                (article.lowercase() == "la" && gender == GenderType.MASCULINE)
-            }
-            LanguageType.ROMANIAN -> {
-                (article.lowercase() == "un" && gender == GenderType.FEMININE) ||
-                (article.lowercase() == "o" && gender == GenderType.MASCULINE)
-            }
-            else -> false
-        }
-    }
-
     fun loadWordForEditing(wordId: Int) {
         viewModelScope.launch {
-            val word = wordCardDao.getWordById(wordId)
-            if (word != null) {
+            val wordWithTranslations = wordCardDao.getWordWithTranslationsById(wordId)
+            if (wordWithTranslations != null) {
+                val word = wordWithTranslations.word
+                val translations = wordWithTranslations.translations.map { it.translation }
                 val isNoun = word.gender != null
-                val foreignWordInput = if (word.article.isNotBlank()) {
-                    "${word.article} ${word.foreignWord}"
-                } else {
-                    word.foreignWord
-                }
                 
                 _uiState.update {
                     it.copy(
                         editingWordId = wordId,
-                        foreignWordInput = foreignWordInput,
-                        derivedForeignWord = word.foreignWord,
-                        russianTranslation = word.russianTranslation,
-                        article = word.article,
+                        fullWord = word.fullWord,
+                        translations = if (translations.isNotEmpty()) translations else listOf(""),
                         selectedGender = word.gender,
                         isNoun = isNoun,
                         saveSuccess = false,
@@ -246,19 +140,20 @@ class AddWordViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, userMessage = null, saveSuccess = false) }
 
             val currentState = _uiState.value
-            val foreignWordToSave = currentState.derivedForeignWord.trim()
-            val russianTranslationToSave = currentState.russianTranslation.trim()
-            val articleToSave = currentState.article.trim()
+            val fullWordToSave = currentState.fullWord.trim()
+            val translationsToSave = currentState.translations
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
 
-            if (foreignWordToSave.isBlank()) {
+            if (fullWordToSave.isBlank()) {
                 _uiState.update {
                     it.copy(isSaving = false, userMessage = "Слово не может быть пустым.")
                 }
                 return@launch
             }
-            if (russianTranslationToSave.isBlank()) {
+            if (translationsToSave.isEmpty()) {
                 _uiState.update {
-                    it.copy(isSaving = false, userMessage = "Русский перевод не может быть пустым.")
+                    it.copy(isSaving = false, userMessage = "Необходимо указать хотя бы один перевод.")
                 }
                 return@launch
             }
@@ -274,39 +169,56 @@ class AddWordViewModel @Inject constructor(
                     // Update existing word
                     val wordCard = WordCardEntity(
                         id = currentState.editingWordId,
-                        foreignWord = foreignWordToSave.lowercase(),
-                        russianTranslation = russianTranslationToSave.lowercase(),
-                        article = articleToSave.lowercase(),
+                        fullWord = fullWordToSave.lowercase(),
                         gender = if (currentState.isNoun) currentState.selectedGender else null,
                         language = selectedLanguage.value
                     )
                     wordCardDao.updateWord(wordCard)
+                    
+                    // Delete old translations and insert new ones
+                    wordCardDao.deleteTranslationsForWord(currentState.editingWordId)
+                    translationsToSave.forEach { translation ->
+                        wordCardDao.insertTranslation(
+                            TranslationEntity(
+                                wordCardId = currentState.editingWordId,
+                                translation = translation.lowercase()
+                            )
+                        )
+                    }
+                    
                     _uiState.update {
                         it.copy(
                             isSaving = false,
-                            userMessage = "Слово '${wordCard.foreignWord}' успешно обновлено!",
+                            userMessage = "Слово '$fullWordToSave' успешно обновлено!",
                             saveSuccess = true
                         )
                     }
                 } else {
                     // Insert new word
                     val wordCard = WordCardEntity(
-                        foreignWord = foreignWordToSave.lowercase(),
-                        russianTranslation = russianTranslationToSave.lowercase(),
-                        article = articleToSave.lowercase(),
+                        fullWord = fullWordToSave.lowercase(),
                         gender = if (currentState.isNoun) currentState.selectedGender else null,
                         language = selectedLanguage.value
                     )
-                    wordCardDao.insertWord(wordCard)
+                    val wordId = wordCardDao.insertWord(wordCard)
+                    
+                    // Insert translations
+                    translationsToSave.forEach { translation ->
+                        wordCardDao.insertTranslation(
+                            TranslationEntity(
+                                wordCardId = wordId.toInt(),
+                                translation = translation.lowercase()
+                            )
+                        )
+                    }
+                    
                     _uiState.update {
                         it.copy(
                             isSaving = false,
-                            userMessage = "Слово '${wordCard.foreignWord}' успешно сохранено!",
+                            userMessage = "Слово '$fullWordToSave' успешно сохранено!",
                             saveSuccess = true,
-                            foreignWordInput = "",
-                            derivedForeignWord = "",
-                            russianTranslation = "",
-                            article = "",
+                            fullWord = "",
+                            translations = listOf(""),
                             selectedGender = null,
                             isNoun = true
                         )
