@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,7 +22,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,8 +30,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,16 +37,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.languagecards.R
 import com.example.languagecards.dao.GenderType
 import com.example.languagecards.dao.LanguageType
 import com.example.languagecards.dao.TranslationEntity
@@ -104,28 +98,33 @@ fun WordListContent(
     val defaultRowColor = Color(0xFFE0E0E0)
 
     val languageLabel = when (selectedLanguage) {
-        LanguageType.ROMANIAN -> "Română"
-        else -> "Français"
+        LanguageType.ROMANIAN -> stringResource(R.string.romanian_label)
+        else -> stringResource(R.string.french_label)
     }
 
     if (uiState.showDeleteConfirmDialog && uiState.wordToDelete != null) {
-        val translationsText = uiState.wordToDelete.translations.joinToString(", ") { it.translation }
+        val translationsText =
+            uiState.wordToDelete.translations.joinToString(", ") { it.translation }
         AlertDialog(
             onDismissRequest = onDismissDeleteDialog,
-            title = { Text("Удалить слово?") },
+            title = { Text(stringResource(R.string.delete_word_title)) },
             text = {
                 Text(
-                    "Вы уверены, что хотите удалить слово \"${uiState.wordToDelete.word.fullWord} / $translationsText\"?"
+                    stringResource(
+                        R.string.delete_word_message,
+                        uiState.wordToDelete.word.fullWord,
+                        translationsText
+                    )
                 )
             },
             confirmButton = {
                 TextButton(onClick = onConfirmDelete) {
-                    Text("Удалить")
+                    Text(stringResource(R.string.delete_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismissDeleteDialog) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.cancel_action))
                 }
             }
         )
@@ -136,7 +135,10 @@ fun WordListContent(
             .exclude(androidx.compose.foundation.layout.WindowInsets.statusBars),
         floatingActionButton = {
             FloatingActionButton(onClick = onNavigateToAddWord) {
-                Icon(Icons.Filled.Add, contentDescription = "Добавить слово")
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.add_word_content_desc)
+                )
             }
         }
     ) { paddingValues ->
@@ -145,9 +147,8 @@ fun WordListContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Простой заголовок вместо TopAppBar
             Text(
-                text = "Список слов ($languageLabel)",
+                text = stringResource(R.string.word_list_title, languageLabel),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -158,12 +159,20 @@ fun WordListContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                label = { Text("Поиск слов...") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Поиск") },
+                label = { Text(stringResource(R.string.search_hint)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = stringResource(R.string.search_content_desc)
+                    )
+                },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { onSearchQueryChanged("") }) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Очистить поиск")
+                            Icon(
+                                Icons.Filled.Clear,
+                                contentDescription = stringResource(R.string.clear_search_content_desc)
+                            )
                         }
                     }
                 },
@@ -181,7 +190,7 @@ fun WordListContent(
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else if (uiState.words.isEmpty() && searchQuery.isNotEmpty()) {
                     Text(
-                        text = "По вашему запросу ничего не найдено.",
+                        text = stringResource(R.string.no_search_results),
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -189,7 +198,7 @@ fun WordListContent(
                     )
                 } else if (uiState.words.isEmpty() && searchQuery.isBlank()) {
                     Text(
-                        text = "Слов пока нет. Нажмите '+' чтобы добавить.",
+                        text = stringResource(R.string.empty_word_list),
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -200,7 +209,9 @@ fun WordListContent(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
-                        items(uiState.words, key = { wordWithTranslations -> wordWithTranslations.word.id }) { wordWithTranslations ->
+                        items(
+                            uiState.words,
+                            key = { wordWithTranslations -> wordWithTranslations.word.id }) { wordWithTranslations ->
                             WordCardItem(
                                 wordWithTranslations = wordWithTranslations,
                                 feminineColor = feminineColor,
@@ -280,11 +291,11 @@ fun WordCardItem(
             onDismissRequest = onDismissMenu
         ) {
             androidx.compose.material3.DropdownMenuItem(
-                text = { Text("Редактировать") },
+                text = { Text(stringResource(R.string.edit_action)) },
                 onClick = onEditClick
             )
             androidx.compose.material3.DropdownMenuItem(
-                text = { Text("Удалить") },
+                text = { Text(stringResource(R.string.delete_action)) },
                 onClick = onDeleteClick
             )
         }
@@ -296,16 +307,37 @@ fun WordCardItem(
 fun WordListScreenPreview() {
     val sampleWords = listOf(
         WordWithTranslations(
-            word = WordCardEntity(id = 1, fullWord = "le chat", gender = GenderType.MASCULINE, language = LanguageType.FRENCH),
+            word = WordCardEntity(
+                id = 1,
+                fullWord = "le chat",
+                gender = GenderType.MASCULINE,
+                language = LanguageType.FRENCH
+            ),
             translations = listOf(TranslationEntity(id = 1, wordCardId = 1, translation = "кот"))
         ),
         WordWithTranslations(
-            word = WordCardEntity(id = 2, fullWord = "la maison", gender = GenderType.FEMININE, language = LanguageType.FRENCH),
-            translations = listOf(TranslationEntity(id = 2, wordCardId = 2, translation = "дом"), TranslationEntity(id = 3, wordCardId = 2, translation = "жилище"))
+            word = WordCardEntity(
+                id = 2,
+                fullWord = "la maison",
+                gender = GenderType.FEMININE,
+                language = LanguageType.FRENCH
+            ),
+            translations = listOf(
+                TranslationEntity(id = 2, wordCardId = 2, translation = "дом"),
+                TranslationEntity(id = 3, wordCardId = 2, translation = "жилище")
+            )
         ),
         WordWithTranslations(
-            word = WordCardEntity(id = 3, fullWord = "bonjour", gender = null, language = LanguageType.FRENCH),
-            translations = listOf(TranslationEntity(id = 4, wordCardId = 3, translation = "привет"), TranslationEntity(id = 5, wordCardId = 3, translation = "здравствуйте"))
+            word = WordCardEntity(
+                id = 3,
+                fullWord = "bonjour",
+                gender = null,
+                language = LanguageType.FRENCH
+            ),
+            translations = listOf(
+                TranslationEntity(id = 4, wordCardId = 3, translation = "привет"),
+                TranslationEntity(id = 5, wordCardId = 3, translation = "здравствуйте")
+            )
         )
     )
 

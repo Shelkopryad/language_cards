@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 object GenderType {
     const val FEMININE = 1
     const val MASCULINE = 2
-    const val NEUTER = 3  // Средний род для румынского
+    const val NEUTER = 3
 }
 
 object LanguageType {
@@ -24,6 +24,6 @@ object LanguageType {
 data class WordCardEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo(name = "full_word") val fullWord: String,
-    @ColumnInfo(name = "gender") val gender: Int?, // null для не-существительных
+    @ColumnInfo(name = "gender") val gender: Int?,
     @ColumnInfo(name = "language") val language: Int = LanguageType.FRENCH,
 )

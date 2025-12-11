@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.List,
-                                        contentDescription = "Word List"
+                                        contentDescription = stringResource(R.string.word_list_nav_desc)
                                     )
                                 }
 
@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Add,
-                                        contentDescription = "Add new word"
+                                        contentDescription = stringResource(R.string.add_word_nav_desc)
                                     )
                                 }
 
@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Settings,
-                                        contentDescription = "Settings"
+                                        contentDescription = stringResource(R.string.settings_nav_desc)
                                     )
                                 }
                             }
@@ -102,7 +102,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         ) { backStackEntry ->
-                            val wordId = backStackEntry.arguments?.getInt("wordId")?.takeIf { it != -1 }
+                            val wordId =
+                                backStackEntry.arguments?.getInt("wordId")?.takeIf { it != -1 }
                             AddWordScreen(
                                 wordId = wordId,
                                 onWordAddedSuccessfully = { navController.popBackStack() }

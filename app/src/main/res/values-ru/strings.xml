@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cards</string>
+    <string name="action_settings">Настройки</string>
+    <string name="first_fragment_label">Первый фрагмент</string>
+    <string name="second_fragment_label">Второй фрагмент</string>
+    <string name="next">Далее</string>
+    <string name="previous">Назад</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Настройки</string>
+    <string name="language_settings_title">Язык словаря</string>
+    <string name="language_settings_description">Выберите язык для изучения. Все слова будут работать с выбранным языком.</string>
+    <string name="french_label">Français</string>
+    <string name="french_subtitle">Французский язык</string>
+    <string name="romanian_label">Română</string>
+    <string name="romanian_subtitle">Румынский язык</string>
+    <string name="language_change_notice">После смены языка все экраны автоматически обновятся при следующем переходе.</string>
+
+    <!-- Word List Screen -->
+    <string name="delete_word_title">Удалить слово?</string>
+    <string name="delete_word_message">Вы уверены, что хотите удалить слово "%1$s / %2$s"?</string>
+    <string name="delete_action">Удалить</string>
+    <string name="cancel_action">Отмена</string>
+    <string name="add_word_content_desc">Добавить слово</string>
+    <string name="word_list_title">Список слов (%s)</string>
+    <string name="search_hint">Поиск слов...</string>
+    <string name="search_content_desc">Поиск</string>
+    <string name="clear_search_content_desc">Очистить поиск</string>
+    <string name="no_search_results">По вашему запросу ничего не найдено.</string>
+    <string name="empty_word_list">Слов пока нет. Нажмите \'+\' чтобы добавить.</string>
+    <string name="edit_action">Редактировать</string>
+
+    <!-- Add Word Screen -->
+    <string name="edit_word_title">Редактировать слово (%s)</string>
+    <string name="add_word_title">Добавить слово (%s)</string>
+    <string name="enter_word_label">Введите слово:</string>
+    <string name="french_word_hint">Французское слово (например: le chat)</string>
+    <string name="romanian_word_hint">Румынское слово (например: un pisică)</string>
+    <string name="russian_translations_label">Русские переводы:</string>
+    <string name="translation_label">Перевод %d</string>
+    <string name="delete_translation_content_desc">Удалить перевод</string>
+    <string name="add_translation_content_desc">Добавить перевод</string>
+    <string name="add_another_translation">Добавить еще перевод</string>
+    <string name="not_a_noun_label">Не существительное</string>
+    <string name="gender_label">Род слова:</string>
+    <string name="gender_masculine">Муж.</string>
+    <string name="gender_feminine">Жен.</string>
+    <string name="gender_neuter">Ср.</string>
+    <string name="update_word_button">Обновить слово</string>
+    <string name="save_word_button">Сохранить слово</string>
+
+    <!-- MainActivity -->
+    <string name="word_list_nav_desc">Список слов</string>
+    <string name="add_word_nav_desc">Добавить новое слово</string>
+    <string name="settings_nav_desc">Настройки</string>
+</resources>

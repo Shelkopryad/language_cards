@@ -43,8 +43,6 @@ interface WordCardDao {
     @Query("DELETE FROM translations WHERE word_card_id = :wordId")
     suspend fun deleteTranslationsForWord(wordId: Int)
 
-    // Поиск по слову и переводам
-    // Используем простой LIKE вместо FTS для надежности
     @androidx.room.Transaction
     @Query("""
         SELECT DISTINCT wc.* FROM word_cards AS wc

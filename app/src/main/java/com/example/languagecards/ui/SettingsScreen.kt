@@ -18,16 +18,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.languagecards.R
 import com.example.languagecards.dao.LanguageType
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,19 +50,19 @@ fun SettingsScreen(
         ) {
             // Простой заголовок вместо TopAppBar
             Text(
-                text = "Настройки",
+                text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Text(
-                text = "Язык словаря",
+                text = stringResource(R.string.language_settings_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
-            
+
             Text(
-                text = "Выберите язык для изучения. Все слова и квизы будут работать с выбранным языком.",
+                text = stringResource(R.string.language_settings_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -70,15 +70,15 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             LanguageOption(
-                title = "Français",
-                subtitle = "Французский язык",
+                title = stringResource(R.string.french_label),
+                subtitle = stringResource(R.string.french_subtitle),
                 isSelected = selectedLanguage == LanguageType.FRENCH,
                 onClick = { viewModel.setLanguage(LanguageType.FRENCH) }
             )
 
             LanguageOption(
-                title = "Română",
-                subtitle = "Румынский язык",
+                title = stringResource(R.string.romanian_label),
+                subtitle = stringResource(R.string.romanian_subtitle),
                 isSelected = selectedLanguage == LanguageType.ROMANIAN,
                 onClick = { viewModel.setLanguage(LanguageType.ROMANIAN) }
             )
@@ -86,7 +86,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Text(
-                text = "После смены языка все экраны автоматически обновятся при следующем переходе.",
+                text = stringResource(R.string.language_change_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -107,9 +107,9 @@ private fun LanguageOption(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) 
-                MaterialTheme.colorScheme.primaryContainer 
-            else 
+            containerColor = if (isSelected)
+                MaterialTheme.colorScheme.primaryContainer
+            else
                 MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(

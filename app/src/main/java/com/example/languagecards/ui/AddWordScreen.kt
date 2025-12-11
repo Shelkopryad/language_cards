@@ -31,17 +31,17 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.languagecards.R
 import com.example.languagecards.dao.GenderType
 import com.example.languagecards.dao.LanguageType
 
@@ -68,21 +68,20 @@ fun AddWordScreen(
     }
 
     val languageLabel = when (selectedLanguage) {
-        LanguageType.ROMANIAN -> "Română"
-        else -> "Français"
+        LanguageType.ROMANIAN -> stringResource(R.string.romanian_label)
+        else -> stringResource(R.string.french_label)
     }
 
     val screenTitle = if (uiState.editingWordId != null) {
-        "Редактировать слово ($languageLabel)"
+        stringResource(R.string.edit_word_title, languageLabel)
     } else {
-        "Добавить слово ($languageLabel)"
+        stringResource(R.string.add_word_title, languageLabel)
     }
 
     Scaffold(
         contentWindowInsets = androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
             .exclude(androidx.compose.foundation.layout.WindowInsets.statusBars)
-    ) {
-        paddingValues ->
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -100,19 +99,19 @@ fun AddWordScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Text(
-                "Введите слово:",
+                stringResource(R.string.enter_word_label),
                 style = MaterialTheme.typography.titleMedium
             )
             OutlinedTextField(
                 value = uiState.fullWord,
                 onValueChange = { viewModel.onFullWordChange(it) },
-                label = { 
+                label = {
                     Text(
-                        if (selectedLanguage == LanguageType.FRENCH) 
-                            "Французское слово (например: le chat)" 
-                        else 
-                            "Румынское слово (например: un pisică)"
-                    ) 
+                        if (selectedLanguage == LanguageType.FRENCH)
+                            stringResource(R.string.french_word_hint)
+                        else
+                            stringResource(R.string.romanian_word_hint)
+                    )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -122,7 +121,7 @@ fun AddWordScreen(
             )
 
             Text(
-                "Русские переводы:",
+                stringResource(R.string.russian_translations_label),
                 style = MaterialTheme.typography.titleMedium
             )
 
@@ -135,7 +134,7 @@ fun AddWordScreen(
                     OutlinedTextField(
                         value = translation,
                         onValueChange = { viewModel.onTranslationChange(index, it) },
-                        label = { Text("Перевод ${index + 1}") },
+                        label = { Text(stringResource(R.string.translation_label, index + 1)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
@@ -148,7 +147,7 @@ fun AddWordScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = "Удалить перевод"
+                                contentDescription = stringResource(R.string.delete_translation_content_desc)
                             )
                         }
                     }
@@ -161,11 +160,11 @@ fun AddWordScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = "Добавить перевод",
+                    contentDescription = stringResource(R.string.add_translation_content_desc),
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Добавить еще перевод")
+                Text(stringResource(R.string.add_another_translation))
             }
 
             // Чекбокс "Не существительное"
@@ -178,7 +177,7 @@ fun AddWordScreen(
                     onCheckedChange = { viewModel.onIsNounChanged(!it) }
                 )
                 Text(
-                    text = "Не существительное",
+                    text = stringResource(R.string.not_a_noun_label),
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
@@ -186,7 +185,7 @@ fun AddWordScreen(
             // Выбор рода (только для существительных)
             if (uiState.isNoun) {
                 Text(
-                    "Род слова:",
+                    stringResource(R.string.gender_label),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -195,7 +194,7 @@ fun AddWordScreen(
                         onClick = { viewModel.onGenderSelected(GenderType.MASCULINE) }
                     )
                     Text(
-                        text = "Муж.",
+                        text = stringResource(R.string.gender_masculine),
                         modifier = Modifier
                             .padding(start = 4.dp)
                             .clickable { viewModel.onGenderSelected(GenderType.MASCULINE) }
@@ -206,7 +205,7 @@ fun AddWordScreen(
                         onClick = { viewModel.onGenderSelected(GenderType.FEMININE) }
                     )
                     Text(
-                        text = "Жен.",
+                        text = stringResource(R.string.gender_feminine),
                         modifier = Modifier
                             .padding(start = 4.dp)
                             .clickable { viewModel.onGenderSelected(GenderType.FEMININE) }
@@ -219,7 +218,7 @@ fun AddWordScreen(
                             onClick = { viewModel.onGenderSelected(GenderType.NEUTER) }
                         )
                         Text(
-                            text = "Ср.",
+                            text = stringResource(R.string.gender_neuter),
                             modifier = Modifier
                                 .padding(start = 4.dp)
                                 .clickable { viewModel.onGenderSelected(GenderType.NEUTER) }
@@ -251,7 +250,11 @@ fun AddWordScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text(if (uiState.editingWordId != null) "Обновить слово" else "Сохранить слово")
+                    Text(
+                        if (uiState.editingWordId != null) stringResource(R.string.update_word_button) else stringResource(
+                            R.string.save_word_button
+                        )
+                    )
                 }
             }
         }
